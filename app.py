@@ -1,5 +1,5 @@
 import requests
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, send_file
 import os
 from dotenv import load_dotenv
 
@@ -10,6 +10,8 @@ load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 REDIRECT_URI = os.getenv('REDIRECT_URI')
+VIDEO_FOLDER = os.path.abspath('./assets/output')
+
 
 
 @app.route('/webhook', methods=['GET', 'POST'])
@@ -50,7 +52,31 @@ def callback():
     }
     response = requests.post(token_url, data=payload)
     access_token = response.json().get("access_token")
-    return "Access token received: " + access_token
+    return jsonify({"message": "Access token generated", "access_token": access_token})
+
+@app.route('/video')
+def serve_video():
+    video_filename = 'output_video.mp4'
+    video_path = os.path.join(VIDEO_FOLDER, video_filename)
+    return send_file(video_path, as_attachment=False)
+
+@app.route('/publish_reel', methods=['POST'])
+def publish_reel():
+    """
+    Endpoint pour publier une vidéo en reel Instagram.
+    """
+    data = request.json
+    video_url = data.get('video_url')  # URL de la vidéo (par exemple exposée via Ngrok)
+    caption = data.get('caption')  # Légende du reel
+
+    if not video_url or not caption:
+        return jsonify({"error": "Missing video_url or caption"}), 400
+
+    try:
+        result = upload_local_video(video_url, caption)
+        return jsonify({"message": "Reel published successfully", "post_id": result["id"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(port=80)
